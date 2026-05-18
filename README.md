@@ -44,6 +44,16 @@ Current dependencies (listed within the environment.yml):
   - sphinx-design
 ```
 
+You may create a conda environment with these libraries (that are probably overkill) with the following command:
+```bash
+conda env create --name spysii --file=environments.yml
+```
+If you do, make sure every time you want to use this software, you load the environment:
+```bash
+conda activate spysii
+```
+Note we **strongly recommend using mamba** (and not conda).
+
 Installation
 --------------
 
