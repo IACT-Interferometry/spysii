@@ -8,26 +8,11 @@ dependencies:
   - numpy=1.23.0
   - astropy=5.0.4
   - pip
-  - bokeh~=2.4.2
-  - click
-  - coloredlogs
   - scipy
   - matplotlib
   - lmfit
-  - yaml
-  - uproot
-  - scipy
+  - click
+  - pyyaml
+  - ipython
+  - pygments
   - jupyter
-  - astroquery
-  - tqdm
-  - corner
-  - pandas
-  # Needed for PMOIRED
-  - ipympl
-  # Needed for documentation with markdown format
-  - sphinx
-  - sphinx-automodapi
-  - pydata-sphinx-theme
-  - sphinx-click
-  - nbsphinx
-  - sphinx-design
