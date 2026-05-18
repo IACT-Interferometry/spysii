@@ -1,0 +1,41 @@
+observatory:
+  location:
+    lat: 31d40m30s
+    lon: -110d57m07s
+  name: VERITAS
+  fixed_baselines: false
+  telescope_cabling_delays:
+  - 676.8e-09
+  - 585.e-09
+  - 955.e-09
+  - 1063.7e-09
+  telescope_locations:
+  - - 135.48
+    - -8.61
+    - 12.23
+  - - 44.1
+    - -47.7
+    - 4.4
+  - - 29.4
+    - 60.1
+    - 9.8
+  - - -35.9
+    - 11.3
+    - 7.0
+  telescope_names:
+  - T1
+  - T2
+  - T3
+  - T4
+  constants:
+    area: [113, 113, 113, 113]
+    alpha_QE: [0.295, 0.295, 0.295, 0.295]
+#    g: 0.236 # In 2019, we had a different optical filter
+    g: [0.304, 0.304, 0.304, 0.304]
+    b_v: [55e6, 55e6, 55e6, 55e6]
+    sigma: [0.87, 0.87, 0.87, 0.87]
+    F: [1.15, 1.15, 1.15, 1.15]
+    bck_light_noise: [1, 1, 1, 1]
+    elec_noise: [0.7, 0.7, 0.7, 0.7]
+    cN: [1, 1, 1, 1]
+    beta0: [1, 1, 1, 1]

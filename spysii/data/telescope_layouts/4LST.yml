@@ -1,0 +1,40 @@
+observatory:
+  location:
+    lat: 28d45m42.1s
+    lon: -17d53m25.2s
+  name: 4LST
+  fixed_baselines: false
+  telescope_cabling_delays:
+  - 755e-09
+  - 755e-09
+  - 755e-09
+  - 755e-09
+  telescope_locations:
+  - - -92.34216
+    - 25.2424
+    - 0
+  - - -79.7838
+    - 127.1841
+    - 0.0
+  - - -209.3672
+    - 61.3956
+    - 0.0
+  - - -193.6738
+    - 171.3456
+    - 0.0
+  telescope_names:
+  - LST1
+  - LST2
+  - LST3
+  - LST4
+  constants:
+    area: [370, 370, 370, 370]
+    alpha_QE: [0.39, 0.39, 0.39, 0.39]
+    g: [0.65, 0.65, 0.65, 0.65]
+    b_v: [500e6, 500e6, 500e6, 500e6]
+    sigma: [0.91, 0.91, 0.91, 0.91]
+    F: [1.21, 1.21, 1.21, 1.21]
+    bck_light_noise: [1, 1, 1, 1]
+    elec_noise: [0.7, 0.7, 0.7, 0.7]
+    cN: [1, 1, 1, 1]
+    beta0: [1, 1, 1, 1]

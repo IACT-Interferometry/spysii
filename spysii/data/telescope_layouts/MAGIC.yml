@@ -1,0 +1,31 @@
+observatory:
+  location:
+    lat: 28d45m42.1s
+    lon: -17d53m25.2s
+  name: MAGIC
+  fixed_baselines: false
+  telescope_cabling_delays:
+  - 555e-09
+  - 0.
+  telescope_locations:
+  - - 0
+    - 0
+    - 0
+  - - 47.9773
+    - 70.5068
+    - -1.1726
+  telescope_names:
+  - M2
+  - M1
+  constants:
+    area: [236, 236]
+    alpha_QE: [0.295, 0.295]
+#    g: 0.236 # In 2019, we had a different optical filter
+    g: [0.304, 0.304]
+    b_v: [110e6, 110e6]
+    sigma: [0.87, 0.87]
+    F: [1.15, 1.15]
+    bck_light_noise: [1, 1]
+    elec_noise: [0.7, 0.7]
+    cN: [1, 1]
+    beta0: [1, 1]
