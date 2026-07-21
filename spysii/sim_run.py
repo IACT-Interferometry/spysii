@@ -20,6 +20,8 @@ from spysii.sensitivity import signal_to_noise
 from spysii.light_travel import get_light_travel_delay, get_array_baselines
 from spysii.visibility import protected_squared_visibility_uniform_disk, protected_squared_visibility_fast_rotator
 from astropy.time import Time
+from astropy.io import fits
+import oifits as oifits_module
 
 valid_observatory_names = ["MAGIC", "MAGIC-LST", "MAGIC-4LST", "VERITAS",
                            "MAGIC-4LST-microstars", "CTA-N", "CTA-N_alpha",
@@ -29,6 +31,28 @@ valid_observatory_names = ["MAGIC", "MAGIC-LST", "MAGIC-4LST", "VERITAS",
                            "MAGIC-4LST-butterfleye", "MAGIC-CTA-N-butterfleye",
                            "4LST", "4LST-butterfleye"
                            ]
+
+def _resolve_telescope_pair(pair, telescope_names):
+    """
+    Identify whether a 'telescope_pair' entry from a simulated_runs result dict refers to
+    two known telescope names (it may instead be a descriptive string, e.g. for the
+    aggregated results produced by fixed-baseline/submirror layouts).
+
+    Returns
+    -------
+    tel_1, tel_2, is_valid: str, str, bool
+        Best-effort string representation of both telescope names, and whether both names
+        could be matched against `telescope_names`.
+    """
+    is_pair = hasattr(pair, '__len__') and not isinstance(pair, str) and len(pair) == 2
+    if is_pair:
+        tel_1, tel_2 = str(pair[0]), str(pair[1])
+        is_valid = tel_1 in telescope_names and tel_2 in telescope_names
+    else:
+        tel_1, tel_2 = str(pair), ''
+        is_valid = False
+    return tel_1, tel_2, is_valid
+
 
 class SimulateSiiRuns(object):
     """
@@ -343,6 +367,8 @@ class SimulateSiiRuns(object):
                 result['W'].append(np.average(uvw_baselines[:, 2]))
                 result['sim_g2'].append(sim_g2)
                 result['sim_g2_error'].append(g2_error)
+        result['datetime'] = datetime
+        result['duration'] = duration
         return result
 
     @u.quantity_input(duration='time')
@@ -543,6 +569,8 @@ class SimulateSiiRuns(object):
                 result['W'].append(np.average(uvw_baselines[i_pair, 2]))
                 result['sim_g2'].append(sim_g2)
                 result['sim_g2_error'].append(g2_error)
+        result['datetime'] = datetime
+        result['duration'] = duration
         return result
 
     @u.quantity_input(duration='time')
@@ -593,6 +621,8 @@ class SimulateSiiRuns(object):
             result['W'].append(0.01)
             result['sim_g2'].append(sim_g2)
             result['sim_g2_error'].append(g2_error)
+        result['datetime'] = datetime
+        result['duration'] = duration
         return result
 
     @u.quantity_input(run_duration='time')
@@ -1016,6 +1046,183 @@ class SimulateSiiRuns(object):
                                                            angles[1].to('deg')))
             print("compression_factor = {:1.3f} +/- {:1.3f}".format(self.fast_rotator_fit['compression_factor'],
                                                                     self.fast_rotator_fit['compression_factor_e']))
+
+    def export_v2_fits(self, filename, overwrite=False):
+        """
+        Export the simulated V^2(u,v) data points to a generic FITS file.
+
+        The file contains a single binary table extension ("V2_DATA") with one row per
+        simulated correlation measurement (baseline/telescope pair, at a given epoch),
+        plus a primary header describing the target and observatory used for the
+        simulation. Columns include the (u, v, w) coordinates, the projected baseline,
+        the simulated squared visibility and its uncertainty, and the mirror areas of
+        the two telescopes involved (when the specific telescope pair for that point is
+        known; e.g. not for the aggregated results produced by fixed-baseline/submirror
+        layouts).
+
+        Parameters
+        ----------
+        filename: str
+            Path of the FITS file to be written.
+
+        overwrite: bool
+            If True, silently overwrite `filename` if it already exists.
+        """
+        if not self.simulated_runs:
+            logging.error("No simulated runs are available to export.")
+            raise ValueError("No simulated runs to export.")
+
+        telescope_names = list(self.observatory['telescope_names'])
+        areas = self.observatory['constants']['area']
+
+        tel_1, tel_2, area_1, area_2 = [], [], [], []
+        u_coord, v_coord, w_coord = [], [], []
+        baseline, baseline_min, baseline_max = [], [], []
+        vis2, vis2_err, mjd = [], [], []
+
+        for run in self.simulated_runs:
+            run_mjd = run['datetime'].mjd if run.get('datetime') is not None else np.nan
+            for i, pair in enumerate(run['telescope_pair']):
+                t1, t2, is_valid = _resolve_telescope_pair(pair, telescope_names)
+                tel_1.append(t1)
+                tel_2.append(t2)
+                if is_valid:
+                    area_1.append(areas[telescope_names.index(t1)])
+                    area_2.append(areas[telescope_names.index(t2)])
+                else:
+                    area_1.append(np.nan)
+                    area_2.append(np.nan)
+                u_coord.append(run['U'][i])
+                v_coord.append(run['V'][i])
+                w_coord.append(run['W'][i])
+                baseline.append(run['baseline'][i])
+                baseline_min.append(run['baseline_min'][i])
+                baseline_max.append(run['baseline_max'][i])
+                vis2.append(run['sim_g2'][i])
+                vis2_err.append(run['sim_g2_error'][i])
+                mjd.append(run_mjd)
+
+        cols = fits.ColDefs([
+            fits.Column(name='TEL_1', format='16A', array=tel_1),
+            fits.Column(name='TEL_2', format='16A', array=tel_2),
+            fits.Column(name='MJD', format='1D', unit='day', array=mjd),
+            fits.Column(name='U', format='1D', unit='m', array=u_coord),
+            fits.Column(name='V', format='1D', unit='m', array=v_coord),
+            fits.Column(name='W', format='1D', unit='m', array=w_coord),
+            fits.Column(name='BASELINE', format='1D', unit='m', array=baseline),
+            fits.Column(name='BASELINE_MIN', format='1D', unit='m', array=baseline_min),
+            fits.Column(name='BASELINE_MAX', format='1D', unit='m', array=baseline_max),
+            fits.Column(name='AREA_1', format='1D', unit='m2', array=area_1),
+            fits.Column(name='AREA_2', format='1D', unit='m2', array=area_2),
+            fits.Column(name='VIS2', format='1D', array=vis2),
+            fits.Column(name='VIS2_ERR', format='1D', array=vis2_err),
+        ])
+        table_hdu = fits.BinTableHDU.from_columns(cols, name='V2_DATA')
+
+        primary_hdu = fits.PrimaryHDU()
+        header = primary_hdu.header
+        header['SOURCE'] = self.source_name, 'Simulated target name'
+        header['OBSERVAT'] = self.observatory_name, 'Simulated observatory layout'
+        header['RA'] = self.target_skycoord.ra.deg, 'Target right ascension (deg, ICRS)'
+        header['DEC'] = self.target_skycoord.dec.deg, 'Target declination (deg, ICRS)'
+        header['BMAG'] = float(self.target_b_mag), 'Target B magnitude'
+        header['DIAM'] = self.stellar_diameter.to('mas').value, 'Assumed stellar diameter (mas)'
+        header['WAVELENG'] = self.wavelength, 'Simulation wavelength (m)'
+        header['ZBCNORM'] = self.zbc_norm, 'Zero baseline correlation normalization'
+
+        fits.HDUList([primary_hdu, table_hdu]).writeto(filename, overwrite=overwrite)
+
+    def export_oifits(self, filename, overwrite=False):
+        """
+        Export the simulated data to an OIFITS file (Duvert, Young & Hummel 2017, A&A
+        597, A8), using the `oifits` module (https://github.com/pboley/oifits) to fill
+        in OI_TARGET, OI_ARRAY, OI_WAVELENGTH and OI_VIS2.
+
+        Since spysii simulates monochromatic squared visibility measurements, a
+        single-channel OI_WAVELENGTH table is written, using the simulation wavelength
+        with an unknown (zero) bandwidth. Telescope pairs that cannot be resolved to two
+        named telescopes (e.g. the aggregated results produced by fixed-baseline
+        /submirror layouts) are written with undefined station indices and their u/v
+        coordinates flagged, since no more specific information is available from the
+        simulation. Telescope diameters are taken from the observatory configuration
+        when available, otherwise derived from the mirror area assuming a circular
+        aperture.
+
+        Parameters
+        ----------
+        filename: str
+            Path of the OIFITS file to be written.
+
+        overwrite: bool
+            If True, silently overwrite `filename` if it already exists.
+        """
+        if not self.simulated_runs:
+            logging.error("No simulated runs are available to export.")
+            raise ValueError("No simulated runs to export.")
+
+        telescope_names = list(self.observatory['telescope_names'])
+        areas = self.observatory['constants']['area']
+        if 'telescope_diameters' in self.observatory:
+            diameters = np.asarray(self.observatory['telescope_diameters'], dtype=float)
+        else:
+            diameters = 2.0 * np.sqrt(np.asarray(areas, dtype=float) / np.pi)
+        locations = self.observatory['telescope_locations']
+
+        oi = oifits_module.oifits()
+
+        target = oifits_module.OI_TARGET(target=self.source_name,
+                                         raep0=self.target_skycoord.ra.deg,
+                                         decep0=self.target_skycoord.dec.deg,
+                                         spectyp='UNKNOWN')
+        oi.target = np.append(oi.target, target)
+
+        wavelength = oifits_module.OI_WAVELENGTH(eff_wave=[self.wavelength], eff_band=[0.0])
+        insname = "{}_SII".format(self.observatory_name)
+        oi.wavelength[insname] = wavelength
+
+        site_xyz = np.array([self.site.x.to('m').value, self.site.y.to('m').value,
+                             self.site.z.to('m').value])
+        stations = [{'TEL_NAME': name, 'STA_NAME': name, 'STA_INDEX': i + 1,
+                     'DIAMETER': float(diameters[i]), 'STAXYZ': np.array(locations[i], dtype=float)}
+                    for i, name in enumerate(telescope_names)]
+        arrname = self.observatory_name
+        array = oifits_module.OI_ARRAY(frame='GEOCENTRIC', arrxyz=site_xyz, stations=stations)
+        oi.array[arrname] = array
+
+        for run in self.simulated_runs:
+            run_datetime = run.get('datetime')
+            timeobs = run_datetime.to_datetime() if run_datetime is not None else None
+            run_duration = run.get('duration')
+            int_time = run_duration.to('s').value if run_duration is not None else 0.0
+
+            for i, pair in enumerate(run['telescope_pair']):
+                t1, t2, is_valid = _resolve_telescope_pair(pair, telescope_names)
+                if is_valid:
+                    station = (array.get_station_by_name(t1), array.get_station_by_name(t2))
+                else:
+                    station = (None, None)
+                    logging.warning("Could not identify individual stations for telescope pair "
+                                    "'{}'; STA_INDEX will be left undefined for this OI_VIS2 "
+                                    "point.".format(pair))
+
+                u_coord = run['U'][i]
+                v_coord = run['V'][i]
+                valid_uv = np.isfinite(u_coord) and np.isfinite(v_coord)
+
+                vis2 = oifits_module.OI_VIS2(timeobs=timeobs,
+                                             int_time=int_time,
+                                             vis2data=[run['sim_g2'][i]],
+                                             vis2err=[run['sim_g2_error'][i]],
+                                             flag=[not valid_uv],
+                                             ucoord=u_coord if valid_uv else 0.0,
+                                             vcoord=v_coord if valid_uv else 0.0,
+                                             wavelength=wavelength,
+                                             target=target,
+                                             array=array,
+                                             station=station)
+                oi.vis2 = np.append(oi.vis2, vis2)
+
+        oi.save(filename, overwrite=overwrite)
 
 
 class CombineSimulatedRuns(object):

@@ -18,6 +18,7 @@ setup(
         'emcee',
         'click',
         'coloredlogs',
+        'oifits',
         # 'yaml',
     ],
     include_package_data=True,
